@@ -26,3 +26,7 @@ Every push to `main` redeploys.
 
 ## Files
 `index.html` viewer · `section.html` detail window · `landxml.js` LandXML/GeoJSON → design JSON · `crosssect.js` cross sections & SVG · `textures.js` sample textures · `egm96_ph.js` geoid grid · `config.js` settings · `export-guide.html` export guide.
+## Terrain (Cesium ion)
+- DTM: asset 6204501 "Bicol CP3 DTM 1m (MSL)" - bare ground with river bed, PRS92 Zone 4, 1 m.
+- DSM: asset 6204507 "Bicol CP3 DSM 1m (MSL)" - switch in Layers > Terrain. Sections always use the DTM.
+- Auto-deploy: Render is connected to GitHub, so every commit to main redeploys the site.
