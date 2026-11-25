@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bicol – Section detail</title>
+<script src="./crosssect.js"></script>
+<script src="./textures.js"></script>
+<style>
+  html,body{margin:0;height:100%;background:#16181b;color:#e8e8e8;font:13px/1.55 system-ui,sans-serif}
+  #app{display:grid;grid-template-rows:auto 1fr auto;height:100%}
+  header{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:8px 12px;background:#1f2226;border-bottom:1px solid #2c3136}
+  #title{font-weight:600;font-size:15px;margin-right:auto}
+  #title .st{color:#ffd54f} .muted{color:#9aa4ad;font-size:12px}
+  button{background:#3a3f45;color:#fff;border:0;border-radius:4px;padding:4px 10px;cursor:pointer;font:inherit}
+  button:disabled{opacity:.45;cursor:default} button.pri{background:#2d6cdf}
+  input[type=text],select{background:#111;color:#eee;border:1px solid #444;border-radius:4px;padding:3px 6px;font:inherit}
+  #staIn{width:90px}
+  main{display:grid;grid-template-columns:1fr 330px;min-height:0}
+  #svgBox{min-height:0;position:relative;padding:6px}
+  #svgBox svg{width:100%;height:100%;display:block}
+  aside{border-left:1px solid #2c3136;padding:10px 12px;overflow:auto;background:#1b1d21}
+  aside h4{margin:12px 0 4px;font-size:12px;color:#9ab;text-transform:uppercase;letter-spacing:.04em}
+  aside h4:first-child{margin-top:0}
+  table.kv{width:100%;border-collapse:collapse} table.kv td{padding:2px 4px;border-bottom:1px solid #2a2e33;vertical-align:top}
+  table.kv td:first-child{color:#9aa4ad;width:44%}
+  #sw{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:4px 0}
+  .sw{background:#111;border:2px solid #333;border-radius:5px;padding:2px;cursor:pointer;text-align:center;font-size:10.5px;line-height:1.25;color:#ccc}
+  .sw img,.sw .none{width:100%;aspect-ratio:1;border-radius:3px;display:block}
+  .sw .none{background:repeating-linear-gradient(45deg,#2a2e33 0 6px,#353a40 6px 12px)}
+  .sw.on{border-color:#e89b2e;color:#fff} .sw.dis{opacity:.35;pointer-events:none}
+  label{display:block;cursor:pointer}
+  #assigns div{display:flex;justify-content:space-between;gap:6px;border-bottom:1px solid #2a2e33;padding:2px 0;font-size:12px}
+  #assigns button{padding:0 7px;background:#4a2a2a}
+  footer{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:5px 12px;background:#1f2226;border-top:1px solid #2c3136;font-size:12px;color:#aab}
+  #readout{color:#eee;min-width:360px}
+  .chip{display:inline-block;width:12px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle}
+  #wait{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#16181b;color:#9aa4ad;font-size:15px;text-align:center;padding:20px}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#7f7;margin-right:5px}
+  .dot.off{background:#f66}
+</style>
+</head>
+<body>
+<div id="wait">Waiting for the main viewer…<br><span class="muted">Open a cross section in the main window, then press “Detail window”.</span></div>
+<div id="app">
+  <header>
+    <span id="title"></span>
+    <button id="bPrev" title="Previous section (←)">◀</button>
+    <button id="bNext" title="Next section (→)">▶</button>
+    <input type="text" id="staIn" placeholder="1+240" title="Go to station (Enter)">
+    <select id="vex" title="Vertical exaggeration"><option value="1">V ×1</option><option value="2">V ×2</option><option value="5">V ×5</option></select>
+    <label style="display:inline"><input type="checkbox" id="chkLbl" checked> Segment labels</label>
+    <span class="muted"><span class="dot" id="link"></span>linked to main window</span>
+  </header>
+  <main>
+    <div id="svgBox"></div>
+    <aside>
+      <h4>Selected</h4>
+      <div id="props" class="muted">Click a segment of the design line (or a shape) in the section.</div>
+      <h4>Texture for this segment</h4>
+      <div id="scope">
+        <label><input type="radio" name="scope" value="reach" checked> <span id="scReach">Same-shape reach</span></label>
+        <label><input type="radio" name="scope" value="all"> Whole alignment</label>
+        <label><input type="radio" name="scope" value="one"> This section only</label>
+      </div>
+      <div id="sw"></div>
+      <div class="muted">The texture is applied in the main window as a band along the alignment, oriented with the dike.</div>
+      <h4>Assignments on this alignment</h4>
+      <div id="assigns" class="muted">None</div>
+      <div style="margin-top:6px"><button id="bClear">Clear all on this alignment</button></div>
+    </aside>
+  </main>
+  <footer>
+    <span id="readout">Move the mouse over the section</span>
+    <span><span class="chip" style="background:#ff6b5b"></span>Design top</span>
+    <span><span class="chip" style="background:#8fa3ad"></span>Datum</span>
+    <span><span class="chip" style="background:#c9c9c4"></span>Concrete</span>
+    <span><span class="chip" style="background:#d2a15f"></span>Existing ground</span>
+    <span id="info"></span>
+  </footer>
+</div>
+<script>
+(() => {
+const CS = window.CrossSect, $ = id => document.getElementById(id);
+const ch = new BroadcastChannel("phreview-section");
+let S = null, sel = null, lastBeat = 0;      // S = current section message from the main window
+const TEX = DikeTextures.all(), texById = id => TEX.find(t => t.id === id);
+
+// swatches
+const add = (id, label, url) => { const b = document.createElement("div"); b.className = "sw dis"; b.dataset.id = id;
+  b.innerHTML = (url ? `<img src="${url}" alt="">` : `<span class="none"></span>`) + label; b.onclick = () => assign(id); $("sw").appendChild(b); };
+add("", "None", null); TEX.forEach(t => add(t.id, t.label, t.url));
+
+function bandsForSvg() { const m = {}; for (const [k, id] of Object.entries(S.bands || {})) { const t = texById(id); if (t) m[k] = { id, url: t.url }; } return m; }
+function draw() {
+  if (!S) return;
+  const box = $("svgBox"), W = Math.max(400, box.clientWidth - 12), H = Math.max(200, box.clientHeight - 12), sec = S.sec;
+  const res = CS.svg(sec, S.ground, { width: W, height: H, vex: +$("vex").value, bands: bandsForSvg(), selected: sel && sel.type === "seg" ? sel.key : null,
+                                     interactive: true, labels: $("chkLbl").checked });
+  box.innerHTML = res.svg;
+  const svg = box.querySelector("svg"), ns = "http://www.w3.org/2000/svg", cur = document.createElementNS(ns, "line");
+  cur.setAttribute("y1", res.map.top); cur.setAttribute("y2", res.map.bottom); cur.setAttribute("stroke", "#fff"); cur.setAttribute("stroke-opacity", ".45");
+  cur.setAttribute("pointer-events", "none"); cur.style.display = "none"; svg.appendChild(cur);
+  svg.onmousemove = ev => { const rc = svg.getBoundingClientRect(), px = (ev.clientX - rc.left) * W / rc.width;
+    if (px < res.map.left || px > res.map.right) { cur.style.display = "none"; return; }
+    const off = res.map.ox(px), dz = CS.designAt(sec, off), gz = CS.interp(S.ground, off);
+    cur.setAttribute("x1", px); cur.setAttribute("x2", px); cur.style.display = "";
+    $("readout").textContent = `offset ${off.toFixed(2)} m` + (dz !== null ? ` · design EL ${dz.toFixed(3)}` : "") + (gz !== null ? ` · ground EL ${gz.toFixed(3)}` : "") +
+      (dz !== null && gz !== null ? ` · ${dz >= gz ? "fill" : "cut"} ${Math.abs(dz - gz).toFixed(2)} m` : ""); };
+  svg.onclick = ev => { const t = ev.target;
+    if (t.dataset.seg) sel = { type: "seg", key: t.dataset.seg };
+    else if (t.dataset.shape !== undefined) sel = { type: "shape", i: +t.dataset.shape };
+    else sel = null;
+    draw(); props(); };
+}
+function row(k, v) { return `<tr><td>${k}</td><td>${v}</td></tr>`; }
+function props() {
+  const on = !!(sel && sel.type === "seg" && S && CS.segments(S.sec).some(s => s.key === sel.key));
+  document.querySelectorAll(".sw").forEach(el => { el.classList.toggle("dis", !on); el.classList.toggle("on", on && (S.bands[sel.key] || "") === el.dataset.id); });
+  if (!S || !sel) { $("props").innerHTML = "Click a segment of the design line (or a shape) in the section."; $("props").className = "muted"; $("scReach").textContent = "Same-shape reach"; return; }
+  $("props").className = "";
+  if (sel.type === "shape") { const sh = S.sec.shapes[sel.i]; if (!sh) { sel = null; return props(); }
+    const e = CS.extent({ links: [], shapes: [sh] });
+    $("props").innerHTML = `<table class="kv">${row("Shape", sh.name)}${row("Area", sh.area.toFixed(3) + " m²")}${row("Offset", `${e.o0.toFixed(2)} ~ ${e.o1.toFixed(2)} m`)}${row("Elevation", `${e.z0.toFixed(3)} ~ ${e.z1.toFixed(3)} m`)}${row("Points", sh.pts.length - 1)}</table>`;
+    $("scReach").textContent = "Same-shape reach"; return; }
+  const s = CS.segments(S.sec).find(x => x.key === sel.key);
+  if (!s) { $("props").innerHTML = `<span class="muted">Segment ${sel.key} does not exist at this station.</span>`; return; }
+  const i = CS.segInfo(s), r = S.reach[s.side], t = texById(S.bands[s.key]);
+  $("props").innerHTML = `<table class="kv">${row("Segment", `${s.key} (${s.side === "L" ? "left" : "right"} side, ${s.idx}${["st","nd","rd"][s.idx - 1] || "th"} from CL)`)}
+    ${row("Link", s.link)}${row("Slope", i.ratio + (i.pct !== null && i.ratio !== "level" ? ` (${i.pct.toFixed(1)} %)` : ""))}
+    ${row("Width / rise", `${i.width.toFixed(3)} m / ${i.rise >= 0 ? "+" : ""}${i.rise.toFixed(3)} m`)}${row("Slope length", i.len.toFixed(3) + " m")}
+    ${row("From", `offset ${s.o1.toFixed(3)} · EL ${s.z1.toFixed(3)}${s.c1 ? " · " + s.c1 : ""}`)}${row("To", `offset ${s.o2.toFixed(3)} · EL ${s.z2.toFixed(3)}${s.c2 ? " · " + s.c2 : ""}`)}
+    ${row("Texture", t ? t.label : "–")}</table>`;
+  $("scReach").textContent = `Same-shape reach (${CS.fmtSta(r.from)} – ${CS.fmtSta(r.to)}, ${r.n} sections)`;
+}
+function assigns() {
+  const a = S.assigns || [];
+  if (!a.length) { $("assigns").className = "muted"; $("assigns").textContent = "None"; return; }
+  $("assigns").className = ""; $("assigns").innerHTML = "";
+  a.forEach((x, i) => { const d = document.createElement("div"), t = texById(x.tex);
+    d.innerHTML = `<span>${x.side}${x.idx} · ${CS.fmtSta(x.from)} – ${CS.fmtSta(x.to)} · <b>${t ? t.label : "None"}</b></span>`;
+    const b = document.createElement("button"); b.textContent = "✕"; b.title = "Remove"; b.onclick = () => ch.postMessage({ type: "unassign", index: i });
+    d.appendChild(b); $("assigns").appendChild(d); });
+}
+function assign(tex) {
+  if (!S || !sel || sel.type !== "seg") return;
+  const s = CS.segments(S.sec).find(x => x.key === sel.key); if (!s) return;
+  const scope = document.querySelector("input[name=scope]:checked").value, r = S.reach[s.side];
+  const from = scope === "all" ? S.staStart : scope === "one" ? S.sec.sta : r.from, to = scope === "all" ? S.staEnd : scope === "one" ? S.sec.sta : r.to;
+  ch.postMessage({ type: "assign", side: s.side, idx: s.idx, from, to, tex });
+}
+ch.onmessage = ev => { const m = ev.data;
+  if (m.type === "section") {
+    const sameAl = S && S.alName === m.alName; S = m; lastBeat = Date.now();
+    if (!sameAl) sel = null;
+    $("wait").style.display = "none";
+    $("title").innerHTML = `${S.alName} <span class="muted">(${S.cluster})</span> · STA <span class="st">${CS.fmtSta(S.sec.sta)}</span>`;
+    document.title = `${S.alName} ${CS.fmtSta(S.sec.sta)} – Section detail`;
+    $("bPrev").disabled = S.si <= 0; $("bNext").disabled = S.si >= S.count - 1;
+    const ar = CS.areas(S.sec);
+    $("info").textContent = `Profile: ${S.profile} · Grade EL ${S.sec.grade.toFixed(3)} m` + Object.entries(ar).map(([k, v]) => ` · ${k} ${v.toFixed(3)} m²`).join("");
+    draw(); props(); assigns();
+  }
+  if (m.type === "closed") { $("wait").style.display = "flex"; $("wait").firstChild.textContent = "The section was closed in the main window."; }
+  if (m.type === "beat") lastBeat = Date.now();
+};
+setInterval(() => $("link").classList.toggle("off", Date.now() - lastBeat > 6000), 1000);
+$("bPrev").onclick = () => ch.postMessage({ type: "nav", d: -1 });
+$("bNext").onclick = () => ch.postMessage({ type: "nav", d: 1 });
+$("staIn").onkeydown = e => { if (e.key === "Enter") { const s = CS.parseSta(e.target.value); if (s !== null) ch.postMessage({ type: "goto", sta: s }); } };
+$("vex").onchange = draw; $("chkLbl").onchange = draw;
+$("bClear").onclick = () => { if (S && confirm(`Remove all segment textures on ${S.alName}?`)) ch.postMessage({ type: "clear" }); };
+document.addEventListener("keydown", e => { if (/INPUT|SELECT/.test(document.activeElement.tagName)) return;
+  if (e.key === "ArrowLeft") ch.postMessage({ type: "nav", d: -1 }); if (e.key === "ArrowRight") ch.postMessage({ type: "nav", d: 1 }); });
+new ResizeObserver(draw).observe($("svgBox"));
+ch.postMessage({ type: "hello" });
+})();
+</script>
+</body>
+</html>

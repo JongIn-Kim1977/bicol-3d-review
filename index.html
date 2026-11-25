@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bicol River Basin – 3D Design Review</title>
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/proj4@2.21.0/dist/proj4.js"></script>
+<script src="./config.js"></script>
+<script src="./egm96_ph.js"></script>
+<script src="./landxml.js"></script>
+<script src="./crosssect.js"></script>
+<script src="./textures.js"></script>
+<style>
+  html,body,#cesium{margin:0;width:100%;height:100%;overflow:hidden;font-family:system-ui,sans-serif}
+  .panel{position:absolute;background:rgba(28,30,34,.92);color:#eee;border-radius:6px;font-size:13px;line-height:1.7;padding:10px 12px}
+  #left{top:10px;left:10px;width:280px;max-height:calc(100% - 40px);overflow:auto}
+  .panel label{display:block;cursor:pointer}
+  .panel h4{margin:8px 0 2px;font-size:12px;color:#9ab;text-transform:uppercase;letter-spacing:.04em}
+  .muted{color:#9a9a9a;font-size:11px;line-height:1.4}
+  .row{display:flex;gap:6px;align-items:center}
+  input[type=text],select{box-sizing:border-box;background:#111;color:#eee;border:1px solid #444;border-radius:4px;padding:2px 6px;font:inherit}
+  button{background:#2d6cdf;color:#fff;border:0;border-radius:4px;padding:4px 10px;cursor:pointer;font:inherit}
+  button.sec{background:#444} button:disabled{opacity:.5;cursor:default}
+  #log{font-size:11px;line-height:1.5;white-space:pre-wrap}
+  .ok{color:#7f7}.err{color:#f88}.warn{color:#fd6}
+  .cl{border-top:1px solid #333;padding:3px 0}
+  #leftHead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .logo{background:#fff;border-radius:4px;padding:3px 7px;display:inline-flex;align-items:center}
+  .logo img{height:18px;display:block}
+  #btnFold{background:#444;padding:1px 9px;font-size:15px;line-height:1.4}
+  #left.folded #leftBody{display:none}
+  #left.folded{width:auto}
+  .ver{display:inline-block;background:#137c8b;color:#fff;border-radius:3px;padding:0 5px;font-size:11px;margin-left:4px}
+  .al{cursor:pointer;color:#cfe3e7;font-size:12px;line-height:1.5;padding-left:8px}
+  .al:hover{color:#fff;text-decoration:underline}
+  #tip{position:absolute;pointer-events:none;background:rgba(0,0,0,.75);color:#fff;font-size:12px;padding:2px 6px;border-radius:3px;display:none}
+  /* section panel */
+  #sec{left:324px;right:10px;bottom:10px;height:330px;display:none;padding:8px 12px;flex-direction:column;background:rgba(28,30,34,.97)}
+  #secHead{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+  #secTitle{font-weight:600;font-size:14px;margin-right:auto}
+  #secTitle .st{color:#ffd54f}
+  #secHead button{padding:2px 9px}
+  #staIn{width:90px}
+  #svgBox{flex:1;min-height:0;position:relative;margin-top:4px}
+  #svgBox svg{width:100%;height:100%;display:block}
+  #secFoot{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11px;color:#aab;align-items:center}
+  #readout{color:#eee;min-width:330px}
+  .chip{display:inline-block;width:12px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle}
+  #left.folded ~ #sec{left:10px}
+  #swatches{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:4px 0}
+  .sw{background:#111;border:2px solid #333;border-radius:5px;padding:2px;cursor:pointer;text-align:center;font-size:10.5px;line-height:1.25;color:#ccc}
+  .sw img,.sw .none{width:100%;aspect-ratio:1;border-radius:3px;display:block}
+  .sw .none{background:repeating-linear-gradient(45deg,#2a2e33 0 6px,#353a40 6px 12px)}
+  .sw.on{border-color:#e89b2e;color:#fff}
+  #texTarget{width:100%}
+  @media (max-width: 700px){
+    #left{width:calc(100% - 20px);max-height:55%}
+    #sec{left:10px;right:10px;height:46%}
+    #readout{min-width:0}
+    #secTitle{flex-basis:100%}
+  }
+</style>
+</head>
+<body>
+<div id="cesium"></div>
+<div id="tip"></div>
+
+<div id="left" class="panel">
+  <div id="leftHead"><span class="logo"><b style="color:#0e4d64;font-size:12px;letter-spacing:.06em">PH · BICOL</b></span><button id="btnFold" title="Fold / unfold">–</button></div>
+  <div id="leftBody">
+  <b id="projTitle">Bicol River Basin – 3D Design Review</b><span class="ver">Ver 1.0</span>
+  <div class="muted">Read-only review · Civil 3D design over DTM / Orthophoto</div>
+  <div class="muted"><a href="./export-guide.html" target="_blank" style="color:#7fc8d6">Civil 3D export guide &amp; XML check ↗</a></div>
+  <h4>Layers</h4>
+  <label><input type="checkbox" id="chkGlobe" checked> Terrain / Orthophoto</label>
+  <label><input type="checkbox" id="chkSurf" checked> Design surfaces</label>
+  <label><input type="checkbox" id="chkConc" checked> Concrete (from cross sections)</label>
+  <label><input type="checkbox" id="chkAlign" checked> Alignments / Stations</label>
+  <label><input type="checkbox" id="chkClip"> Cut terrain under channel surfaces</label>
+  <div class="row">Opacity <input type="range" id="alpha" min="0.2" max="1" step="0.05" value="1" style="flex:1"></div>
+  <div class="row" style="margin-top:4px"><button id="btnZoom">Zoom to project</button></div>
+  <h4>Dike texture <span class="muted">(prototype)</span></h4>
+  <select id="texTarget" title="Surface to texture"><option value="*">All design surfaces</option></select>
+  <div id="swatches"></div>
+  <label><input type="checkbox" id="chkFlat" checked> Flat areas (crest, berm) as gravel road</label>
+  <div class="muted">Generic samples for visual review, not the design material. Choice is kept in this browser.</div>
+  <h4>Open design file <span class="muted">(local)</span></h4>
+  <div class="muted">Civil 3D LandXML (.xml) or GeoJSON. Choose files or drag &amp; drop them onto the map. Files are read in this browser only – nothing is uploaded.</div>
+  <input type="text" id="locCluster" placeholder="Cluster / package name (optional)" style="width:100%;margin:4px 0">
+  <div class="row"><select id="locCrs" style="flex:1" title="Coordinate system of the file">
+    <option value="auto">CRS: from file</option><option value="3124">PRS92 Zone 4 (Bicol)</option><option value="3125">PRS92 Zone 5</option>
+    <option value="3123">PRS92 Zone 3</option><option value="3122">PRS92 Zone 2</option><option value="3121">PRS92 Zone 1</option>
+    <option value="32651">WGS84 / UTM 51N</option><option value="32650">WGS84 / UTM 50N</option><option value="4326">WGS84 lon/lat</option></select>
+    <select id="locH" title="Heights in GeoJSON"><option value="ground">Z: ground</option><option value="msl">Z: MSL</option><option value="ellipsoid">Z: ellipsoid</option></select></div>
+  <input type="file" id="locFile" accept=".xml,.geojson,.json" multiple style="width:100%;margin-top:4px;color:#ccc;font-size:12px">
+  <h4>Clusters</h4>
+  <div id="clusters"></div>
+  <h4>Cross sections</h4>
+  <div class="muted">Click a design surface or alignment (within 40 m) to open the section at that station. ◀ ▶ or arrow keys step 5 m.</div>
+  <div id="aligns"></div>
+  <div class="muted" style="margin-top:6px">Red line = dike crest (design profile) · Blue line = on ground</div>
+  <h4>Status</h4>
+  <div id="log"></div>
+  </div>
+</div>
+
+<div id="sec" class="panel">
+  <div id="secHead">
+    <span id="secTitle"></span>
+    <button class="sec" id="bPrev" title="Previous section (←)">◀</button>
+    <button class="sec" id="bNext" title="Next section (→)">▶</button>
+    <input type="text" id="staIn" placeholder="1+240" title="Go to station">
+    <select id="vex" title="Vertical exaggeration"><option value="1">V ×1</option><option value="2">V ×2</option><option value="5">V ×5</option></select>
+    <button class="sec" id="bDetail" title="Open the section in a separate window (e.g. on a second monitor)">⧉ Detail window</button>
+    <button class="sec" id="bFly">Fly to</button>
+    <button class="sec" id="bLink">Copy link</button>
+    <button class="sec" id="bClose">✕</button>
+  </div>
+  <div id="svgBox"></div>
+  <div id="secFoot">
+    <span id="readout">Move the mouse over the section</span>
+    <span><span class="chip" style="background:#ff6b5b"></span>Design top</span>
+    <span><span class="chip" style="background:#8fa3ad"></span>Datum</span>
+    <span><span class="chip" style="background:#c9c9c4"></span>Concrete</span>
+    <span><span class="chip" style="background:#d2a15f"></span>Existing ground (DTM)</span>
+    <span id="secInfo"></span>
+  </div>
+</div>
+
+<script>
+(async () => {
+const C = window.APP_CONFIG, CS = window.CrossSect;
+const $ = id => document.getElementById(id);
+const log = (cls, msg) => { const d = document.createElement("div"); d.className = cls; d.textContent = msg; $("log").appendChild(d); (cls === "err" ? console.error : console.log)(msg); };
+if (location.protocol === "file:") log("err", "Open via a web server, not file://");
+
+// ---------- Cesium ----------
+if (C.ION_TOKEN) Cesium.Ion.defaultAccessToken = C.ION_TOKEN;
+const viewer = new Cesium.Viewer("cesium", { timeline: false, animation: false, baseLayerPicker: false, baseLayer: false, geocoder: false,
+  navigationInstructionsInitiallyVisible: false });
+const scene = viewer.scene;
+scene.globe.depthTestAgainstTerrain = true;
+scene.globe.baseColor = Cesium.Color.DARKSLATEGRAY;
+const ESRI = () => new Cesium.UrlTemplateImageryProvider({ url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  maximumLevel: 19, credit: new Cesium.Credit("Imagery © Esri, Maxar, Earthstar Geographics") });
+try {
+  if (C.ION_TOKEN) viewer.imageryLayers.addImageryProvider(await Cesium.IonImageryProvider.fromAssetId(2));
+  else viewer.imageryLayers.addImageryProvider(ESRI());
+  if (C.ION_TOKEN && C.ORTHO_ASSET_ID) viewer.imageryLayers.addImageryProvider(await Cesium.IonImageryProvider.fromAssetId(C.ORTHO_ASSET_ID));
+  log("ok", C.ION_TOKEN && C.ORTHO_ASSET_ID ? "✔ Orthophoto" : "✔ Satellite imagery (Esri)");
+} catch (e) { log("err", `✖ Imagery: ${e.message || e}`); try { viewer.imageryLayers.addImageryProvider(ESRI()); } catch (e2) {} }
+if (C.ION_TOKEN) {
+  try {
+    scene.terrainProvider = C.TERRAIN_ASSET_ID ? await Cesium.CesiumTerrainProvider.fromIonAssetId(C.TERRAIN_ASSET_ID) : await Cesium.createWorldTerrainAsync();
+    log("ok", C.TERRAIN_ASSET_ID ? "✔ Terrain (DTM)" : "✔ Terrain (Cesium World Terrain)");
+  } catch (e) { log("err", `✖ Terrain: ${e.message || e}`); }
+} else log("warn", "No Cesium ion token in config.js: flat globe, no terrain. Existing ground in sections needs a token.");
+
+// ---------- Supabase (read only) ----------
+const sb = C.SUPABASE_URL && C.SUPABASE_KEY ? supabase.createClient(C.SUPABASE_URL, C.SUPABASE_KEY) : null;
+const pubUrl = p => sb.storage.from(C.BUCKET).getPublicUrl(p).data.publicUrl;
+
+// ---------- design rendering (same as Ver 1.0) ----------
+const groups = new Map();          // key -> {cluster, prim, conc, ds, design, row, xs}
+let alpha = 1;
+function decode(b64) { const s = atob(b64), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return new Float32Array(u.buffer); }
+function flatNormals(pos) {
+  const nrm = new Float32Array(pos.length);
+  for (let i = 0; i < pos.length; i += 9) {
+    const ax = pos[i+3]-pos[i], ay = pos[i+4]-pos[i+1], az = pos[i+5]-pos[i+2], bx = pos[i+6]-pos[i], by = pos[i+7]-pos[i+1], bz = pos[i+8]-pos[i+2];
+    let nx = ay*bz-az*by, ny = az*bx-ax*bz, nz = ax*by-ay*bx; const l = Math.hypot(nx, ny, nz) || 1; nx/=l; ny/=l; nz/=l;
+    for (let k = 0; k < 3; k++) { nrm[i+k*3] = nx; nrm[i+k*3+1] = ny; nrm[i+k*3+2] = nz; }
+  }
+  return nrm;
+}
+function triGeometry(pos) {
+  const n = pos.length / 3, idx = n > 65535 ? new Uint32Array(n) : new Uint16Array(n); for (let i = 0; i < n; i++) idx[i] = i;
+  return new Cesium.Geometry({
+    attributes: {
+      position: new Cesium.GeometryAttribute({ componentDatatype: Cesium.ComponentDatatype.DOUBLE, componentsPerAttribute: 3, values: pos }),
+      normal: new Cesium.GeometryAttribute({ componentDatatype: Cesium.ComponentDatatype.FLOAT, componentsPerAttribute: 3, values: flatNormals(pos) }) },
+    indices: idx, primitiveType: Cesium.PrimitiveType.TRIANGLES, boundingSphere: Cesium.BoundingSphere.fromVertices(pos) });
+}
+function render(key, cluster, d, row) {
+  const g = { cluster, design: d, row, prim: null, conc: null, ds: new Cesium.CustomDataSource(key), ids: [], xs: null, surfs: [], tex: {}, mm: null };
+  if (d.surfaces && d.surfaces.length) {
+    const o = d.origin, mm = Cesium.Transforms.eastNorthUpToFixedFrame(Cesium.Cartesian3.fromDegrees(o.lon, o.lat, o.h));
+    g.mm = mm;
+    const inst = d.surfaces.map((s, si) => {
+      const id = { cluster, surface: s.name, key: `${key}#${si}`, color: new Cesium.Color(...s.color, 1) };
+      const pos = new Float64Array(decode(s.positions));
+      g.ids.push(id); g.surfs.push({ name: s.name, pos, id });
+      return new Cesium.GeometryInstance({ geometry: triGeometry(pos), id,
+        attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(id.color.withAlpha(alpha)), show: new Cesium.ShowGeometryInstanceAttribute(true) } });
+    });
+    g.prim = scene.primitives.add(new Cesium.Primitive({ geometryInstances: inst, modelMatrix: mm, asynchronous: false,
+      appearance: new Cesium.PerInstanceColorAppearance({ translucent: true, closed: false, faceForward: true }) }));
+    g.prim.show = $("chkSurf").checked;
+  }
+  for (const f of (d.alignments?.features || [])) {
+    const c = f.geometry.coordinates, p = f.properties, gt = f.geometry.type;
+    if (gt === "LineString" || gt === "MultiLineString") {
+      for (const line of gt === "LineString" ? [c] : c) {
+        const is3D = line[0].length === 3;
+        g.ds.entities.add({ name: p.name || cluster, properties: { alignment: p.name || "" },
+          description: `<b>${p.name || ""}</b><br>Cluster: ${cluster}<br>${p.sta_from ? p.sta_from + " ~ " + p.sta_to + "<br>" : ""}Profile: ${p.profile ?? "-"}<br>${p.height || ""}`,
+          polyline: { positions: is3D ? Cesium.Cartesian3.fromDegreesArrayHeights(line.flat()) : Cesium.Cartesian3.fromDegreesArray(line.flat()),
+                      clampToGround: !is3D, width: 3, material: is3D ? Cesium.Color.RED : Cesium.Color.DODGERBLUE } });
+      }
+    } else if (gt === "Point") {
+      const is3D = c.length === 3, hr = is3D ? Cesium.HeightReference.NONE : Cesium.HeightReference.CLAMP_TO_GROUND;
+      g.ds.entities.add({ position: Cesium.Cartesian3.fromDegrees(c[0], c[1], is3D ? c[2] : 0),
+        point: { pixelSize: 5, color: Cesium.Color.YELLOW, heightReference: hr, disableDepthTestDistance: Number.POSITIVE_INFINITY },
+        label: p.label || p.name ? { text: p.label || p.name, font: "12px sans-serif", pixelOffset: new Cesium.Cartesian2(0, -14), fillColor: Cesium.Color.WHITE,
+          outlineWidth: 2, style: Cesium.LabelStyle.FILL_AND_OUTLINE, heightReference: hr,
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 1500), disableDepthTestDistance: Number.POSITIVE_INFINITY } : undefined });
+    }
+  }
+  for (const f of (d.areas?.features || [])) {
+    const polys = f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.coordinates;
+    for (const poly of polys) g.ds.entities.add({ name: f.properties.name || cluster,
+      polygon: { hierarchy: Cesium.Cartesian3.fromDegreesArray(poly[0].map(q => [q[0], q[1]]).flat()), material: Cesium.Color.ORANGE.withAlpha(0.35), classificationType: Cesium.ClassificationType.TERRAIN } });
+  }
+  viewer.dataSources.add(g.ds); g.ds.show = $("chkAlign").checked;
+  groups.set(key, g); updateClip();
+  return g;
+}
+function setAlpha(a) {
+  alpha = a;
+  for (const g of groups.values()) if (g.prim) for (const id of g.ids) {
+    try { g.prim.getGeometryInstanceAttributes(id).color = Cesium.ColorGeometryInstanceAttribute.toValue(id.color.withAlpha(a)); } catch (e) {}
+  }
+}
+function updateClip() {
+  const m = (C.CLIP_MATCH || "").toLowerCase(), polys = [];
+  for (const g of groups.values()) if (!g.hidden) for (const f of (g.design.footprints?.features || []))
+    if (m && f.properties.name.toLowerCase().includes(m))
+      polys.push(new Cesium.ClippingPolygon({ positions: Cesium.Cartesian3.fromDegreesArray(f.geometry.coordinates[0].slice(0, -1).flat()) }));
+  scene.globe.clippingPolygons = new Cesium.ClippingPolygonCollection({ polygons: polys, enabled: $("chkClip").checked && polys.length > 0 });
+}
+function zoomAll() {
+  const pts = [...groups.values()].filter(g => !g.hidden).map(g => Cesium.Cartesian3.fromDegrees(g.design.origin.lon, g.design.origin.lat, 0));
+  if (!pts.length) return viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(C.HOME.lon, C.HOME.lat, C.HOME.height) });
+  const bs = Cesium.BoundingSphere.fromPoints(pts);
+  viewer.camera.flyToBoundingSphere(bs, { offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), bs.radius * 2.5 + 4000) });
+}
+const showGroup = g => {
+  if (g.prim) g.prim.show = !g.hidden && $("chkSurf").checked;
+  for (const ps of Object.values(g.tex)) for (const p of ps) p.show = !g.hidden && $("chkSurf").checked;
+  for (const ps of Object.values(g.bandPrims || {})) for (const p of ps) p.show = !g.hidden && $("chkSurf").checked;
+  if (g.conc) g.conc.show = !g.hidden && $("chkConc").checked;
+  g.ds.show = !g.hidden && $("chkAlign").checked;
+};
+
+// ---------- dike texture (prototype) ----------
+// slope triangles get a box-mapped image texture; flat triangles (crest, berm) optionally become gravel-road colour
+const TEX_KEY = "phreview.textures";
+let texChoice = {};
+try { texChoice = JSON.parse(localStorage.getItem(TEX_KEY) || "{}") || {}; } catch (e) { texChoice = {}; }
+const saveTex = () => { try { localStorage.setItem(TEX_KEY, JSON.stringify(texChoice)); } catch (e) {} };
+const surfKey = (g, si) => `${g.cluster}|${g.surfs[si].name}`;
+function texturedGeometry(pos, tile) {
+  const n = pos.length / 3, st = new Float32Array(n * 2), nrm = flatNormals(pos);
+  for (let i = 0; i < pos.length; i += 9) {
+    const ax = Math.abs(nrm[i]), ay = Math.abs(nrm[i + 1]), az = Math.abs(nrm[i + 2]);
+    for (let k = 0; k < 3; k++) {                               // box mapping by dominant normal axis (ENU)
+      const x = pos[i + k * 3], y = pos[i + k * 3 + 1], z = pos[i + k * 3 + 2], j = (i / 3 + k) * 2;
+      if (az >= ax && az >= ay) { st[j] = x / tile; st[j + 1] = y / tile; }
+      else if (ax >= ay) { st[j] = y / tile; st[j + 1] = z / tile; } else { st[j] = x / tile; st[j + 1] = z / tile; }
+    }
+    const j0 = (i / 3) * 2, fu = Math.floor(st[j0]), fv = Math.floor(st[j0 + 1]);   // shift by whole tiles: same look, small numbers
+    for (let k = 0; k < 3; k++) { st[j0 + k * 2] -= fu; st[j0 + k * 2 + 1] -= fv; }
+  }
+  const idx = n > 65535 ? new Uint32Array(n) : new Uint16Array(n); for (let i = 0; i < n; i++) idx[i] = i;
+  return new Cesium.Geometry({ attributes: {
+      position: new Cesium.GeometryAttribute({ componentDatatype: Cesium.ComponentDatatype.DOUBLE, componentsPerAttribute: 3, values: pos }),
+      normal: new Cesium.GeometryAttribute({ componentDatatype: Cesium.ComponentDatatype.FLOAT, componentsPerAttribute: 3, values: nrm }),
+      st: new Cesium.GeometryAttribute({ componentDatatype: Cesium.ComponentDatatype.FLOAT, componentsPerAttribute: 2, values: st }) },
+    indices: idx, primitiveType: Cesium.PrimitiveType.TRIANGLES, boundingSphere: Cesium.BoundingSphere.fromVertices(pos) });
+}
+function applyTexture(g, si, texId) {
+  for (const p of g.tex[si] || []) scene.primitives.remove(p);
+  delete g.tex[si];
+  const sf = g.surfs[si], t = texId && DikeTextures.get(texId);
+  try { g.prim.getGeometryInstanceAttributes(sf.id).show = Cesium.ShowGeometryInstanceAttribute.toValue(!t); } catch (e) {}
+  if (!t) return;
+  const keepFlat = $("chkFlat").checked, nrm = flatNormals(sf.pos), slope = [], flat = [];
+  for (let i = 0; i < sf.pos.length; i += 9) {
+    const dst = keepFlat && nrm[i + 2] > 0.985 ? flat : slope;     // flatter than about 1:6 = crest / berm
+    for (let k = 0; k < 9; k++) dst.push(sf.pos[i + k]);
+  }
+  const prims = [], id = { cluster: g.cluster, surface: `${sf.name} · ${t.label}` };
+  // compressVertices: false — Cesium packs st into 0..1 when compressing, which smears repeating (st > 1) textures
+  if (slope.length) prims.push(scene.primitives.add(new Cesium.Primitive({ asynchronous: false, modelMatrix: g.mm, compressVertices: false,
+    geometryInstances: new Cesium.GeometryInstance({ geometry: texturedGeometry(new Float64Array(slope), t.tile), id }),
+    appearance: new Cesium.MaterialAppearance({ material: Cesium.Material.fromType("Image", { image: t.url, repeat: new Cesium.Cartesian2(1, 1) }),
+      materialSupport: Cesium.MaterialAppearance.MaterialSupport.TEXTURED, faceForward: true, closed: false, translucent: false }) })));
+  if (flat.length) prims.push(scene.primitives.add(new Cesium.Primitive({ asynchronous: false, modelMatrix: g.mm,
+    geometryInstances: new Cesium.GeometryInstance({ geometry: triGeometry(new Float64Array(flat)), id: { cluster: g.cluster, surface: sf.name },
+      attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(Cesium.Color.fromCssColorString("#bcb096")) } }),
+    appearance: new Cesium.PerInstanceColorAppearance({ translucent: false, closed: false, faceForward: true }) })));
+  g.tex[si] = prims; showGroup(g);
+}
+function eachTarget(fn) {
+  const tg = $("texTarget").value;
+  for (const [key, g] of groups) g.surfs.forEach((sf, si) => { if (tg === "*" || tg === `${key}#${si}`) fn(g, si); });
+}
+function setTexture(texId) {
+  if (texId && $("chkConc").checked) { $("chkConc").checked = false; groups.forEach(showGroup);   // concrete strips would cover the texture
+    log("warn", "Concrete layer turned off to show the texture (tick it again to compare)"); }
+  eachTarget((g, si) => { if (texId) texChoice[surfKey(g, si)] = texId; else delete texChoice[surfKey(g, si)]; applyTexture(g, si, texId); });
+  saveTex(); markSwatch();
+}
+function markSwatch() {
+  const ids = new Set(); eachTarget((g, si) => ids.add(texChoice[surfKey(g, si)] || ""));
+  document.querySelectorAll(".sw").forEach(el => el.classList.toggle("on", ids.size === 1 && ids.has(el.dataset.id)));
+}
+function buildTextureUI() {
+  const box = $("swatches"); box.textContent = "";
+  const add = (id, label, url) => { const b = document.createElement("div"); b.className = "sw"; b.dataset.id = id; b.title = label;
+    b.innerHTML = (url ? `<img src="${url}" alt="">` : `<span class="none"></span>`) + label; b.onclick = () => setTexture(id); box.appendChild(b); };
+  add("", "Design colour", null);
+  for (const t of DikeTextures.all()) add(t.id, t.label, t.url);
+  const sel = $("texTarget");
+  for (const [key, g] of groups) if (g.surfs.length) {
+    const og = document.createElement("optgroup"); og.label = g.cluster;
+    g.surfs.forEach((sf, si) => { const o = document.createElement("option"); o.value = `${key}#${si}`; o.textContent = sf.name; og.appendChild(o); });
+    sel.appendChild(og);
+  }
+  sel.onchange = markSwatch;
+  $("chkFlat").onchange = () => { for (const g of groups.values()) g.surfs.forEach((sf, si) => { const t = texChoice[surfKey(g, si)]; if (t) applyTexture(g, si, t); }); };
+  for (const g of groups.values()) g.surfs.forEach((sf, si) => { const t = texChoice[surfKey(g, si)]; if (t && DikeTextures.get(t)) applyTexture(g, si, t); });
+  markSwatch();
+}
+
+// ---------- per-segment textures (bands along the alignment) ----------
+const BAND_KEY = "phreview.bands";
+let bandStore = {};                                        // alignment name -> [{side, idx, from, to, tex}]
+try { bandStore = JSON.parse(localStorage.getItem(BAND_KEY) || "{}") || {}; } catch (e) { bandStore = {}; }
+const saveBands = () => { try { localStorage.setItem(BAND_KEY, JSON.stringify(bandStore)); } catch (e) {} };
+function buildBands(g, al) {
+  g.bandPrims = g.bandPrims || {};
+  for (const p of g.bandPrims[al.name] || []) scene.primitives.remove(p);
+  g.bandPrims[al.name] = [];
+  const quads = CS.bandQuads(al, bandStore[al.name] || []), prims = [];
+  for (const [texId, list] of Object.entries(quads)) {
+    const t = DikeTextures.get(texId); if (!t || !list.length) continue;
+    const pos = new Float64Array(list.length * 18), st = new Float32Array(list.length * 12); let p = 0, q = 0;
+    for (const quad of list) {
+      const c = quad.map(([sta, off, z]) => cart(g.xs, al, sta, off, z, 0.05));
+      const fu = Math.floor(quad[0][3] / t.tile), fv = Math.floor(quad[0][4] / t.tile);
+      for (const k of [0, 1, 2, 0, 2, 3]) {                  // two triangles; st = (station, distance along slope) / tile
+        pos[p++] = c[k].x; pos[p++] = c[k].y; pos[p++] = c[k].z;
+        st[q++] = quad[k][3] / t.tile - fu; st[q++] = quad[k][4] / t.tile - fv;
+      }
+    }
+    const n = pos.length / 3, idx = n > 65535 ? new Uint32Array(n) : new Uint16Array(n); for (let i = 0; i < n; i++) idx[i] = i;
+    const geom = new Cesium.Geometry({ attributes: {
+        position: new Cesium.GeometryAttribute({ componentDatatype: Cesium.ComponentDatatype.DOUBLE, componentsPerAttribute: 3, values: pos }),
+        normal: new Cesium.GeometryAttribute({ componentDatatype: Cesium.ComponentDatatype.FLOAT, componentsPerAttribute: 3, values: flatNormals(pos) }),
+        st: new Cesium.GeometryAttribute({ componentDatatype: Cesium.ComponentDatatype.FLOAT, componentsPerAttribute: 2, values: st }) },
+      indices: idx, primitiveType: Cesium.PrimitiveType.TRIANGLES, boundingSphere: Cesium.BoundingSphere.fromVertices(pos) });
+    prims.push(scene.primitives.add(new Cesium.Primitive({ asynchronous: false, compressVertices: false,
+      geometryInstances: new Cesium.GeometryInstance({ geometry: geom, id: { cluster: g.cluster, surface: `${al.name} · ${t.label} (segment)` } }),
+      appearance: new Cesium.MaterialAppearance({ material: Cesium.Material.fromType("Image", { image: t.url, repeat: new Cesium.Cartesian2(1, 1) }),
+        materialSupport: Cesium.MaterialAppearance.MaterialSupport.TEXTURED, faceForward: true, closed: false, translucent: false }) })));
+  }
+  g.bandPrims[al.name] = prims; showGroup(g);
+}
+function bandsAt(al, si) {                                 // {segmentKey: texId} at one section
+  return CS.bandMap({ sections: [al.sections[si]] }, bandStore[al.name] || [])[0];
+}
+
+// ---------- detail window (BroadcastChannel) ----------
+const chan = ("BroadcastChannel" in window) ? new BroadcastChannel("phreview-section") : null;
+function sendSection() {
+  if (!chan || !cur) return;
+  const { g, al, sec } = current();
+  chan.postMessage({ type: "section", alName: al.name, cluster: g.cluster, profile: al.profile, si: cur.si, count: al.sections.length,
+    staStart: al.staStart, staEnd: al.staEnd, sec: { sta: sec.sta, grade: sec.grade, links: sec.links, shapes: sec.shapes },
+    ground: groundCache.get(`${al.name}|${sec.sta}`) || null, bands: bandsAt(al, cur.si),
+    reach: { L: CS.reach(al, cur.si, "L"), R: CS.reach(al, cur.si, "R") }, assigns: bandStore[al.name] || [] });
+}
+if (chan) {
+  chan.onmessage = ev => { const m = ev.data;
+    if (m.type === "hello") sendSection();
+    if (!cur) return;
+    const { g, al } = current();
+    if (m.type === "nav") step(m.d);
+    if (m.type === "goto") openSection(cur.key, cur.ai, CS.nearestIndex(al, m.sta), false);
+    if (m.type === "assign" || m.type === "unassign" || m.type === "clear") {
+      const list = bandStore[al.name] = bandStore[al.name] || [];
+      if (m.type === "assign") list.push({ side: m.side, idx: m.idx, from: m.from, to: m.to, tex: m.tex || "" });
+      if (m.type === "unassign") list.splice(m.index, 1);
+      if (m.type === "clear") list.length = 0;
+      if (!list.length) delete bandStore[al.name];
+      saveBands(); buildBands(g, al); redraw(); sendSection();
+    }
+  };
+  setInterval(() => chan.postMessage({ type: "beat" }), 2000);
+}
+let detailWin = null;
+$("bDetail").onclick = () => {
+  if (detailWin && !detailWin.closed) { detailWin.focus(); sendSection(); return; }
+  detailWin = window.open("./section.html", "phreview-section-detail", "width=1200,height=720");
+  if (!detailWin) alert("The browser blocked the pop-up window. Allow pop-ups for this site and try again.");
+};
+
+// ---------- cross sections ----------
+// xs = { epsg, alignments, toLL(E,N)->[lon,lat], toGrid(lon,lat)->[E,N] }
+function setupXs(xs) {
+  const def = CS.CRS[String(xs.epsg)];
+  if (!def) throw new Error(`Unsupported coordinate system EPSG:${xs.epsg}`);
+  const t = proj4(def, "EPSG:4326");
+  xs.toLL = (E, N) => t.forward([E, N]); xs.toGrid = (lon, lat) => t.inverse([lon, lat]);
+  return xs;
+}
+// (alignment, sta, off, zMSL) -> Cartesian3 (ellipsoid height = MSL + EGM96)
+function cart(xs, al, sta, off, z, lift = 0) {
+  const [E, N] = CS.gridPoint(al, sta, off), [lon, lat] = xs.toLL(E, N);
+  return Cesium.Cartesian3.fromDegrees(lon, lat, z + BMRB.geoid(lat, lon) + lift);
+}
+function buildConcrete(g) {
+  const xs = g.xs, inst = [];
+  for (const al of xs.alignments) {
+    const tris = CS.loft(al, "Concrete"); if (!tris.length) continue;
+    const cache = new Map(), pos = new Float64Array(tris.length * 9); let i = 0;
+    for (const tri of tris) for (const [sta, off, z] of tri) {
+      const k = sta + "|" + off + "|" + z; let c = cache.get(k);
+      if (!c) { c = cart(xs, al, sta, off, z, 0.03); cache.set(k, c); }
+      pos[i++] = c.x; pos[i++] = c.y; pos[i++] = c.z;
+    }
+    inst.push(new Cesium.GeometryInstance({ geometry: triGeometry(pos), id: { cluster: g.cluster, surface: `${al.name} · Concrete` },
+      attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(Cesium.Color.fromCssColorString("#d4d4cf")) } }));
+  }
+  if (!inst.length) return;
+  g.conc = scene.primitives.add(new Cesium.Primitive({ geometryInstances: inst, asynchronous: false,
+    appearance: new Cesium.PerInstanceColorAppearance({ translucent: false, closed: false, faceForward: true }) }));
+  showGroup(g);
+}
+async function loadSections(g, textIn) {
+  const r = g.row;
+  if (!textIn && (!r || r.kind !== "landxml" || !/\.xml$/i.test(r.original_path || ""))) return;
+  try {
+    const text = textIn || await (await fetch(pubUrl(r.original_path))).text();
+    if (!/<CrossSects\b/.test(text)) return;
+    const xs = setupXs(CS.parse(text));
+    xs.warnings.forEach(w => log("warn", `${g.cluster}: ${w}`));
+    if (!xs.alignments.length) return;
+    g.xs = xs; buildConcrete(g); renderAligns();
+    for (const al of xs.alignments) if (bandStore[al.name]) buildBands(g, al);
+    log("ok", `✔ ${g.cluster}: ${xs.alignments.reduce((a, al) => a + al.sections.length, 0)} cross sections on ${xs.alignments.length} alignments`);
+  } catch (e) { log("err", `✖ ${g.cluster} sections: ${e.message || e}`); }
+}
+
+// ---------- cluster list ----------
+let rows = [];
+async function loadAll() {
+  if (!sb) { renderList(); log("warn", "No Supabase in config.js: open design files from your PC (Open design file)."); return []; }
+  $("clusters").textContent = "Loading…";
+  const { data, error } = await sb.from("design_uploads").select("*").eq("active", true).order("created_at");
+  if (error) { $("clusters").textContent = ""; log("err", `✖ Design list: ${error.message}`); return []; }
+  rows = data;
+  for (const r of rows) {
+    try { const d = await (await fetch(pubUrl(r.converted_path))).json(); render(r.id, r.cluster, d, r); }
+    catch (e) { log("err", `✖ ${r.cluster}: ${e.message || e}`); }
+  }
+  renderList();
+  log("ok", `✔ Design: ${rows.length} file(s)`);
+  return Promise.all([...groups.values()].map(loadSections));
+}
+function renderList() {
+  const box = $("clusters"); box.textContent = "";
+  const names = [...new Set([...C.CLUSTERS, ...rows.map(r => r.cluster)])];
+  for (const cl of names) {
+    const act = rows.filter(r => r.cluster === cl);
+    const div = document.createElement("div"); div.className = "cl"; box.appendChild(div);
+    if (!act.length) { div.innerHTML = `<span style="color:#888">${cl}</span> <span class="muted">– no design yet</span>`; continue; }
+    const lbl = document.createElement("label"), cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = true;
+    lbl.append(cb, ` ${cl}`); div.appendChild(lbl);
+    cb.onchange = () => { for (const g of groups.values()) if (g.cluster === cl) { g.hidden = !cb.checked; showGroup(g); } updateClip(); renderAligns(); };
+    for (const r of act) { const m = document.createElement("div"); m.className = "muted";
+      m.textContent = `${r.file_name} · ${new Date(r.created_at).toLocaleDateString()}${r.note ? " · " + r.note : ""}`; div.appendChild(m); }
+  }
+}
+function renderAligns() {
+  const box = $("aligns"); box.textContent = "";
+  for (const [key, g] of groups) if (g.xs && !g.hidden) {
+    const h = document.createElement("div"); h.className = "muted"; h.style.marginTop = "4px"; h.textContent = g.cluster; box.appendChild(h);
+    g.xs.alignments.forEach((al, ai) => { const d = document.createElement("div"); d.className = "al";
+      d.textContent = `${al.name}  ${CS.fmtSta(al.staStart)} – ${CS.fmtSta(al.staEnd)}`;
+      d.onclick = () => openSection(key, ai, 0, true); box.appendChild(d); });
+  }
+}
+
+// ---------- local files (no server needed) ----------
+let localN = 0;
+async function openLocalFiles(files) {
+  for (const file of files) {
+    const isXml = /\.xml$/i.test(file.name), crs = $("locCrs").value;
+    const cluster = $("locCluster").value.trim() || file.name.replace(/\.[^.]+$/, "");
+    try {
+      log("muted", `Reading ${file.name} (${(file.size / 1048576).toFixed(1)} MB)…`);
+      const text = await file.text();
+      const d = isXml ? BMRB.parseLandXML(text, { crs, cluster, fileName: file.name })
+                      : BMRB.parseGeoJSON(text, { crs, cluster, fileName: file.name, heights: $("locH").value });
+      (d.log || []).forEach(m => log("muted", `${file.name}: ${m}`));
+      const key = `local-${++localN}`, row = { id: key, cluster, kind: d.kind, file_name: file.name, created_at: new Date().toISOString(), note: "local file" };
+      rows.push(row);
+      const g = render(key, cluster, d, row);
+      if (isXml && /<CrossSects\b/.test(text)) await loadSections(g, text);
+      log("ok", `✔ ${file.name}: ${d.surfaces.length} surface(s), ${d.alignments.features.length} line/point feature(s)`);
+    } catch (e) { log("err", `✖ ${file.name}: ${e.message || e}`); }
+  }
+  renderList(); renderAligns();
+  $("texTarget").innerHTML = '<option value="*">All design surfaces</option>'; buildTextureUI();
+  zoomAll();
+}
+
+// ---------- section panel ----------
+let cur = null, marker = null, groundCache = new Map(), reqId = 0;
+function current() { const g = groups.get(cur.key); const al = g.xs.alignments[cur.ai]; return { g, al, sec: al.sections[cur.si] }; }
+async function sampleGround(xs, al, sec) {
+  const k = `${al.name}|${sec.sta}`; if (groundCache.has(k)) return groundCache.get(k);
+  const e = CS.extent(sec), m = Math.max(5, (e.o1 - e.o0) * 0.25), o0 = e.o0 - m, o1 = e.o1 + m;
+  const step = Math.max(0.5, (o1 - o0) / 160), offs = [];
+  for (let o = o0; o <= o1 + 1e-6; o += step) offs.push(o);
+  const ll = offs.map(o => { const [E, N] = CS.gridPoint(al, sec.sta, o); return xs.toLL(E, N); });
+  if (scene.terrainProvider instanceof Cesium.EllipsoidTerrainProvider) throw new Error("terrain (DTM) is not loaded");
+  const sampler = window.BMRB_SAMPLE_TERRAIN || Cesium.sampleTerrainMostDetailed;      // hook for offline tests
+  const res = await sampler(scene.terrainProvider, ll.map(([lon, lat]) => Cesium.Cartographic.fromDegrees(lon, lat)));
+  const out = res.map((c, i) => [offs[i], c.height - BMRB.geoid(ll[i][1], ll[i][0])]).filter(p => isFinite(p[1]));
+  groundCache.set(k, out); return out;
+}
+function draw(ground) {
+  const { g, al, sec } = current(), box = $("svgBox");
+  const W = Math.max(320, box.clientWidth), H = Math.max(140, box.clientHeight);
+  const bm = {}; for (const [k, id] of Object.entries(bandsAt(al, cur.si))) { const t = DikeTextures.get(id); if (t) bm[k] = { id, url: t.url }; }
+  const res = CS.svg(sec, ground, { width: W, height: H, vex: +$("vex").value, bands: bm });
+  box.innerHTML = res.svg;
+  const svg = box.querySelector("svg"), ns = "http://www.w3.org/2000/svg";
+  const cursor = document.createElementNS(ns, "line");
+  cursor.setAttribute("y1", res.map.top); cursor.setAttribute("y2", res.map.bottom); cursor.setAttribute("stroke", "#fff"); cursor.setAttribute("stroke-opacity", "0.5"); cursor.style.display = "none";
+  svg.appendChild(cursor);
+  svg.onmousemove = ev => {
+    const rc = svg.getBoundingClientRect(), px = (ev.clientX - rc.left) * W / rc.width;
+    if (px < res.map.left || px > res.map.right) { cursor.style.display = "none"; return; }
+    const off = res.map.ox(px), dz = CS.designAt(sec, off), gz = CS.interp(ground, off);
+    cursor.setAttribute("x1", px); cursor.setAttribute("x2", px); cursor.style.display = "";
+    $("readout").textContent = `offset ${off.toFixed(2)} m` + (dz !== null ? ` · design EL ${dz.toFixed(3)}` : "") +
+      (gz !== null ? ` · ground EL ${gz.toFixed(3)}` : "") + (dz !== null && gz !== null ? ` · ${dz >= gz ? "fill" : "cut"} ${Math.abs(dz - gz).toFixed(2)} m` : "");
+  };
+  svg.onmouseleave = () => { cursor.style.display = "none"; };
+}
+function redraw() { if (cur) draw(groundCache.get(`${current().al.name}|${current().sec.sta}`) || null); }
+function marker3D(g, al, sec) {
+  clearMarker();
+  const xs = g.xs, yel = Cesium.Color.fromCssColorString("#ffd54f");
+  marker = { label: viewer.entities.add({ position: cart(xs, al, sec.sta, 0, sec.grade, 0.6),
+    label: { text: `${al.name}\n${CS.fmtSta(sec.sta)}`, font: "13px sans-serif", fillColor: yel, outlineWidth: 3,
+      style: Cesium.LabelStyle.FILL_AND_OUTLINE, pixelOffset: new Cesium.Cartesian2(0, -24), disableDepthTestDistance: Number.POSITIVE_INFINITY } }),
+    parts: sec.links.map(l => viewer.entities.add({ polyline: { positions: l.pts.map(([o, z]) => cart(xs, al, sec.sta, o, z, 0.08)),
+      width: 4, material: yel, depthFailMaterial: yel.withAlpha(0.5) } })) };
+}
+function clearMarker() { if (!marker) return; marker.parts.forEach(e => viewer.entities.remove(e)); viewer.entities.remove(marker.label); marker = null; }
+function flyToSection() {
+  const { g, al, sec } = current(), p = CS.at(al, sec.sta);
+  const c = cart(g.xs, al, sec.sta, 0, sec.grade), e = CS.extent(sec);
+  const heading = Math.atan2(p.tE, p.tN);                       // look up-station, along the alignment
+  viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(c, Math.max(10, (e.o1 - e.o0) / 2)),
+    { offset: new Cesium.HeadingPitchRange(heading, Cesium.Math.toRadians(-18), Math.max(45, (e.o1 - e.o0) * 2.2)), duration: 1.2 });
+}
+async function openSection(key, ai, si, fly) {
+  cur = { key, ai, si };
+  const { g, al, sec } = current();
+  $("sec").style.display = "flex";
+  $("secTitle").innerHTML = `${al.name} <span class="muted">(${g.cluster})</span> · STA <span class="st">${CS.fmtSta(sec.sta)}</span>`;
+  $("staIn").value = "";
+  const ar = CS.areas(sec);
+  $("secInfo").textContent = `Profile: ${al.profile} · Grade EL ${sec.grade.toFixed(3)} m` +
+    Object.entries(ar).map(([k, v]) => ` · ${k} ${v.toFixed(3)} m²`).join("");
+  $("bPrev").disabled = si <= 0; $("bNext").disabled = si >= al.sections.length - 1;
+  history.replaceState(null, "", `?a=${encodeURIComponent(al.name)}&s=${sec.sta.toFixed(2)}`);
+  marker3D(g, al, sec);
+  draw(groundCache.get(`${al.name}|${sec.sta}`) || null);
+  if (fly) flyToSection();
+  sendSection();
+  const id = ++reqId;
+  try { const gr = await sampleGround(g.xs, al, sec); if (id === reqId) { draw(gr); sendSection(); } }
+  catch (e) { if (id === reqId) $("readout").textContent = `Existing ground not shown: ${e.message || e}`; }
+}
+function step(d) { if (!cur) return; const { al } = current(); const si = Math.max(0, Math.min(al.sections.length - 1, cur.si + d)); if (si !== cur.si) openSection(cur.key, cur.ai, si, false); }
+$("bPrev").onclick = () => step(-1); $("bNext").onclick = () => step(1);
+$("bClose").onclick = () => { $("sec").style.display = "none"; clearMarker(); cur = null; history.replaceState(null, "", location.pathname); if (chan) chan.postMessage({ type: "closed" }); };
+$("bFly").onclick = () => cur && flyToSection();
+$("bLink").onclick = async () => { try { await navigator.clipboard.writeText(location.href); $("bLink").textContent = "Copied ✓"; } catch (e) { prompt("Copy this link:", location.href); }
+  setTimeout(() => $("bLink").textContent = "Copy link", 1500); };
+$("vex").onchange = () => cur && draw(groundCache.get(`${current().al.name}|${current().sec.sta}`) || null);
+$("staIn").onkeydown = e => { if (e.key !== "Enter" || !cur) return; const s = CS.parseSta(e.target.value);
+  if (s === null) return; const { al } = current(); openSection(cur.key, cur.ai, CS.nearestIndex(al, s), true); };
+document.addEventListener("keydown", e => { if (!cur || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if (e.key === "ArrowLeft") step(-1); if (e.key === "ArrowRight") step(1); if (e.key === "Escape") $("bClose").onclick(); });
+new ResizeObserver(() => cur && draw(groundCache.get(`${current().al.name}|${current().sec.sta}`) || null)).observe($("svgBox"));
+
+// click in 3D -> nearest alignment with sections (within 60 m) -> section
+function pickSection(lon, lat) {
+  let best = null;
+  for (const [key, g] of groups) if (g.xs && !g.hidden) {
+    const [E, N] = g.xs.toGrid(lon, lat);
+    g.xs.alignments.forEach((al, ai) => { const p = CS.project(al, E, N);
+      if (p.dist <= 40 && p.sta >= al.staStart - 3 && p.sta <= al.staEnd + 3 && (!best || p.dist < best.dist)) best = { key, ai, sta: p.sta, dist: p.dist }; });
+  }
+  return best;
+}
+new Cesium.ScreenSpaceEventHandler(scene.canvas).setInputAction(ev => {
+  let pos = scene.pickPositionSupported ? scene.pickPosition(ev.position) : undefined;
+  if (!pos) pos = scene.globe.pick(viewer.camera.getPickRay(ev.position), scene);
+  if (!pos) return;
+  const c = Cesium.Cartographic.fromCartesian(pos), b = pickSection(Cesium.Math.toDegrees(c.longitude), Cesium.Math.toDegrees(c.latitude));
+  if (!b) return;
+  viewer.selectedEntity = undefined;
+  const al = groups.get(b.key).xs.alignments[b.ai];
+  openSection(b.key, b.ai, CS.nearestIndex(al, b.sta), false);
+}, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+// ---------- UI ----------
+$("chkGlobe").onchange = e => scene.globe.show = e.target.checked;
+$("chkSurf").onchange = () => groups.forEach(showGroup);
+$("chkConc").onchange = () => groups.forEach(showGroup);
+$("chkAlign").onchange = () => groups.forEach(showGroup);
+$("chkClip").onchange = updateClip;
+$("alpha").oninput = e => setAlpha(+e.target.value);
+$("btnZoom").onclick = zoomAll;
+const fold = f => { $("left").classList.toggle("folded", f); $("btnFold").textContent = f ? "☰" : "–"; };
+$("btnFold").onclick = () => fold(!$("left").classList.contains("folded"));
+if (window.innerWidth < 700) fold(true);
+const tip = $("tip");
+new Cesium.ScreenSpaceEventHandler(scene.canvas).setInputAction(m => {
+  const p = scene.pick(m.endPosition);
+  if (p && p.id && p.id.surface) { tip.style.display = "block"; tip.style.left = m.endPosition.x + 14 + "px"; tip.style.top = m.endPosition.y + 8 + "px"; tip.textContent = `${p.id.cluster} · ${p.id.surface}`; }
+  else tip.style.display = "none";
+}, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+$("locFile").onchange = e => { openLocalFiles([...e.target.files]); e.target.value = ""; };
+document.addEventListener("dragover", e => e.preventDefault());
+document.addEventListener("drop", e => { e.preventDefault();
+  const f = [...(e.dataTransfer?.files || [])].filter(f => /\.(xml|geojson|json)$/i.test(f.name)); if (f.length) openLocalFiles(f); });
+if (C.TITLE) { $("projTitle").textContent = C.TITLE; document.title = C.TITLE; }
+
+// ---------- start ----------
+await loadAll();
+buildTextureUI();
+const q = new URLSearchParams(location.search), qa = q.get("a"), qs = CS.parseSta(q.get("s") || "");
+let opened = false;
+if (qa) for (const [key, g] of groups) if (g.xs && !opened) {
+  const ai = g.xs.alignments.findIndex(al => al.name === qa);
+  if (ai >= 0) { const al = g.xs.alignments[ai]; openSection(key, ai, CS.nearestIndex(al, qs ?? al.staStart), true); opened = true; }
+}
+if (qa && !opened) log("warn", `Link: alignment "${qa}" not found`);
+if (!opened) zoomAll();
+})();
+</script>
+</body>
+</html>

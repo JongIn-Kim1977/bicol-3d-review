@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bicol – Civil 3D Export Guide</title>
+<script src="./crosssect.js"></script>
+<style>
+  :root{--navy:#0e4d64;--teal:#137c8b;--amber:#e89b2e;--tint:#eaf2f3;--line:#c8d6da;--mute:#5e6b73;--ok:#2e8b57;--warn:#b7791f;--err:#c0392b}
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.6 system-ui,"Segoe UI",sans-serif;color:#1b2a33;background:#f6f9fa}
+  header{background:var(--navy);color:#fff;padding:14px 24px 0}
+  header h1{margin:0;font-size:20px} header .sub{color:#cfe3e7;font-size:13px;margin:2px 0 10px}
+  .ver{background:var(--amber);border-radius:3px;padding:1px 7px;font-size:12px;font-weight:700;margin-left:6px}
+  nav{display:flex;gap:2px;flex-wrap:wrap}
+  nav button{background:transparent;color:#cfe3e7;border:0;border-bottom:3px solid transparent;padding:8px 14px;font:inherit;cursor:pointer}
+  nav button.on{color:#fff;border-bottom-color:var(--amber);font-weight:600}
+  main{max-width:1060px;margin:0 auto;padding:18px 24px 40px}
+  section.tab{display:none} section.tab.on{display:block}
+  h2{color:var(--navy);font-size:18px;margin:6px 0 10px}
+  .lead{color:#33444d;margin:0 0 14px}
+  .rule{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin-bottom:12px;break-inside:avoid}
+  .rule h3{margin:0 0 6px;font-size:15px;color:var(--teal)} .rule h3 .id{display:inline-block;background:var(--navy);color:#fff;border-radius:4px;padding:0 7px;margin-right:6px;font-size:12px}
+  .rule ol,.rule ul{margin:4px 0 6px;padding-left:20px} .rule li{margin-bottom:3px}
+  .why{background:var(--tint);border-radius:6px;padding:6px 10px;font-size:13px;color:#2b3d46}
+  .why b{color:var(--navy)}
+  code{font-family:Consolas,"Courier New",monospace;background:#eef2f3;border-radius:3px;padding:0 4px;font-size:12.5px}
+  .flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0 16px;font-size:13px}
+  .flow span{background:#fff;border:1px solid var(--line);border-radius:16px;padding:3px 11px}
+  .flow i{color:var(--amber);font-style:normal;font-weight:700}
+  #drop{border:2px dashed var(--teal);border-radius:10px;background:#fff;padding:26px;text-align:center;color:var(--mute);cursor:pointer}
+  #drop.over{background:var(--tint)}
+  table{width:100%;border-collapse:collapse;background:#fff}
+  th{background:var(--navy);color:#fff;text-align:left;padding:6px 8px;font-weight:600;font-size:13px}
+  td{padding:5px 8px;border-bottom:1px solid #e3eaec;vertical-align:top;font-size:13px}
+  .st{font-weight:700;white-space:nowrap} .st.ok{color:var(--ok)} .st.warn{color:var(--warn)} .st.err{color:var(--err)} .st.info{color:var(--mute)}
+  .sum{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+  .sum div{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px} .sum b{font-size:18px;display:block}
+  button.act{background:var(--teal);color:#fff;border:0;border-radius:5px;padding:6px 14px;font:inherit;cursor:pointer;margin-right:6px}
+  button.sec{background:#dfe8ea;color:#1b2a33}
+  input[type=text]{border:1px solid var(--line);border-radius:5px;padding:5px 8px;font:inherit}
+  .muted{color:var(--mute);font-size:13px}
+  .chg{background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin-bottom:10px}
+  .chg h3{margin:0;font-size:15px;color:var(--navy)}
+  details{margin-top:4px} summary{cursor:pointer;color:var(--teal)}
+  @media print{
+    header nav,.noprint,#tab-check,#tab-dec,#tab-log{display:none!important}
+    section.tab#tab-guide{display:block!important} body{background:#fff} header{background:#fff;color:#000;padding:0} header .sub{color:#333}
+    .rule{border-color:#999}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Civil 3D Export Guide <span class="ver" id="gver"></span></h1>
+  <div class="sub">Bicol 3D Design Review · for design engineers · how to export LandXML so the review platform reads it correctly</div>
+  <nav>
+    <button data-tab="guide" class="on">1. Export guide</button>
+    <button data-tab="check">2. Check my XML</button>
+    <button data-tab="dec">3. Review decisions</button>
+    <button data-tab="log">4. Change log</button>
+  </nav>
+</header>
+<main>
+  <!-- 1 -->
+  <section class="tab on" id="tab-guide">
+    <div class="flow"><span>Civil 3D</span><i>→</i><span>LandXML (rules R1–R7)</span><i>→</i><span>Check my XML</span><i>→</i><span>Upload (Ver 1.x)</span><i>→</i><span>Review (Ver 2.0)</span><i>→</i><span>Decision sheet</span><i>→</i><span>Civil 3D (R8)</span></div>
+    <p class="lead" id="glead"></p>
+    <div id="rules"></div>
+    <p class="noprint"><button class="act" onclick="window.print()">Print / save as PDF</button><a href="./index.html">Back to the viewer</a></p>
+  </section>
+  <!-- 2 -->
+  <section class="tab" id="tab-check">
+    <h2>Check my XML</h2>
+    <p class="lead">Drop the LandXML file here <b>before uploading</b>. The file is checked inside your browser; nothing is uploaded.</p>
+    <div id="drop">Drop a .xml file here, or click to choose<input type="file" id="file" accept=".xml" hidden></div>
+    <div id="result"></div>
+  </section>
+  <!-- 3 -->
+  <section class="tab" id="tab-dec">
+    <h2>Review decisions</h2>
+    <p class="lead">Texture choices made in the viewer <b>in this browser</b>, translated into the Civil 3D codes of rule R4. Send the CSV to the design team; they apply it with rule R8.</p>
+    <p class="noprint">Reviewer <input type="text" id="who" placeholder="name"> &nbsp; Note <input type="text" id="note" placeholder="e.g. Site meeting 20 Oct" style="width:280px"></p>
+    <div id="dec"></div>
+  </section>
+  <!-- 4 -->
+  <section class="tab" id="tab-log">
+    <h2>Change log</h2>
+    <p class="lead">When a rule changes, the platform team edits the <code>GUIDE</code> block at the top of this page's script and adds an entry here. Engineers always see the current rules at the same link.</p>
+    <div id="log"></div>
+  </section>
+</main>
+<script>
+/* =====================================================================================
+ *  GUIDE — edit this block to update the manual (rules, codes, change log).
+ * ===================================================================================== */
+const GUIDE = {
+  version: "1.0", date: "2026-10-15",
+  lead: "Follow these rules for every LandXML you upload. Each rule says what to set in Civil 3D and why the platform needs it. " +
+        "Menu names can differ slightly between Civil 3D versions; if you cannot find an option, ask the platform team before exporting the whole cluster.",
+  epsg: "3124", sectionSpacing: 5,
+  textureCodes: { concrete: "SP_Concrete", grouted: "SP_GroutedRiprap", gabion: "SP_Gabion", sodding: "SP_Sodding", riprap: "SP_Riprap" },
+  textureNames: { concrete: "Concrete slope", grouted: "Grouted riprap", gabion: "Gabion", sodding: "Sodding", riprap: "Riprap" },
+  acceptedShapes: ["Concrete", "Pave1"],          // accepted for now, in addition to SP_* codes
+  rules: [
+    { id: "R1", title: "Coordinate system and units",
+      steps: ["Toolspace → Settings → drawing → <b>Edit Drawing Settings</b> → <i>Units and Zone</i>.",
+              "Zone: <b>PRS92 / Philippines zone 5 (EPSG:3125)</b> for InFRA2 (5B Agno: zone 3, EPSG:3123).",
+              "Drawing units: <b>meters</b>."],
+      why: "The platform places the design on the LiDAR terrain using the EPSG code written in the file. Without it, the design lands in the wrong place." },
+    { id: "R2", title: "Alignment and design profile",
+      steps: ["Every dike / channel alignment has its <b>design crest profile</b>.",
+              "Make the design profile the <b>first profile</b> under the alignment in Prospector (rename others, e.g. <code>zz_EG</code>, if needed).",
+              "The profile must cover the full corridor station range."],
+      why: "Cross-section elevations in LandXML are relative to the design profile. Sections without a profile cannot be placed and are skipped (e.g. BypassChannel_v0)." },
+    { id: "R3", title: "Corridor frequency",
+      steps: ["Corridor Properties → Parameters → Frequency: <b>5 m</b> on tangents, curves and spirals.",
+              "Tick <i>At horizontal geometry points</i>, <i>At profile geometry points</i> and region boundaries."],
+      why: "The viewer shows one section every 5 m and joins neighbouring sections for 3D materials. Gaps over 10 m break the 3D bands." },
+    { id: "R4", title: "Codes: Top on every face, Datum below, shapes for materials",
+      steps: ["Every exposed face — crest, <b>both</b> slopes, berms, toe — must be a link with the code <code>Top</code>. Check both sides: mirrored subassemblies often lose it on one side.",
+              "The bottom of each layer is coded <code>Datum</code>.",
+              "Slope-protection shapes use one of: <code>SP_Concrete</code>, <code>SP_GroutedRiprap</code>, <code>SP_Gabion</code>, <code>SP_Sodding</code>, <code>SP_Riprap</code>. (<code>Concrete</code> is still accepted.)",
+              "Code Set Style: add these codes so they are written to LandXML."],
+      why: "The viewer draws, measures and textures only <code>Top</code> faces, and reads the material from the shape code. A slope with only a shape and no Top link cannot be selected properly." },
+    { id: "R5", title: "Sample lines (cross sections)",
+      steps: ["Sample Lines → one group per alignment, name <code>SLG_&lt;Alignment&gt;</code>.",
+              "By range of stations, increment <b>5 m</b> (same as the corridor frequency).",
+              "Sources: the <b>corridor</b> (so links and shapes keep their codes). Swath: at least 10 m beyond both toes."],
+      why: "These sections are what the viewer shows when a station is clicked." },
+    { id: "R6", title: "LandXML export",
+      steps: ["Toolspace → Settings → drawing (right-click) → <b>LandXML Settings</b> → Export: LandXML <b>1.2</b>; enable cross-section export for sample line groups.",
+              "Output → <b>Export to LandXML</b>: tick alignments with profiles, sample line groups and corridor surfaces.",
+              "<b>Do not</b> include the LiDAR existing-ground surface (the platform already has the terrain). Keep the file under 50 MB."],
+      why: "One file carries the 3D surfaces, the alignments and the sections the viewer needs." },
+    { id: "R7", title: "File name",
+      steps: ["<code>Ver&lt;n&gt;_Bicol_&lt;Cluster&gt;Cluster_&lt;ddMonyyyy&gt;_&lt;initials&gt;.xml</code>, e.g. <code>Ver1_Bicol_BuayanCluster_08Oct2026_mbt.xml</code>.",
+              "Increase <code>Ver</code> each time the cluster is re-issued."],
+      why: "The upload history (Ver 1.x) shows file names; a clear name tells reviewers which issue they are looking at." },
+    { id: "R8", title: "Applying review decisions",
+      steps: ["You receive a decision sheet (CSV) from <i>3. Review decisions</i>.",
+              "For each row, set the requested shape code on that side and station range (split the corridor region if needed). Segment names count from the centreline: L1, L2 … left; R1, R2 … right.",
+              "Rebuild the corridor, export following R1–R7, run <i>2. Check my XML</i>, upload through Ver 1.x with the note <code>Decision sheet &lt;date&gt; applied</code>."],
+      why: "This closes the loop: the reviewers' choices come back as design data, and everyone sees them in the next file." }
+  ],
+  changelog: [
+    { v: "1.0", date: "2026-10-15", items: [
+      "First issue: rules R1–R8.",
+      "R4 added after the Buayan file of 08 Oct 2026: many left slopes had the Concrete shape but no Top link.",
+      "Check my XML and Review decisions tabs." ] }
+  ]
+};
+/* ===================================================================================== */
+
+const $ = id => document.getElementById(id), CS = window.CrossSect;
+$("gver").textContent = `v${GUIDE.version} · ${GUIDE.date}`;
+$("glead").innerHTML = GUIDE.lead;
+$("rules").innerHTML = GUIDE.rules.map(r => `<div class="rule" id="${r.id}"><h3><span class="id">${r.id}</span>${r.title}</h3>
+  <ol>${r.steps.map(s => `<li>${s}</li>`).join("")}</ol><div class="why"><b>Why:</b> ${r.why}</div></div>`).join("");
+$("log").innerHTML = GUIDE.changelog.map(c => `<div class="chg"><h3>v${c.v} · ${c.date}</h3><ul>${c.items.map(i => `<li>${i}</li>`).join("")}</ul></div>`).join("");
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll("section.tab").forEach(s => s.classList.toggle("on", s.id === "tab-" + b.dataset.tab));
+  if (b.dataset.tab === "dec") decisions();
+  history.replaceState(null, "", "#" + b.dataset.tab);
+});
+if (location.hash) { const b = document.querySelector(`nav button[data-tab="${location.hash.slice(1)}"]`); if (b) b.click(); }
+
+// ---------------- 2. checker ----------------
+const drop = $("drop");
+drop.onclick = () => $("file").click();
+$("file").onchange = e => e.target.files[0] && check(e.target.files[0]);
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); if (e.dataTransfer.files[0]) check(e.dataTransfer.files[0]); };
+
+const sideOf = s => { const c = s.pts.reduce((a, p) => a + p[0], 0) / s.pts.length; return c < 0 ? "L" : "R"; };
+function missingTop(sec) {          // sides where a shape reaches further out than the Top links (links only, not shape edges)
+  const res = [];
+  for (const side of ["L", "R"]) {
+    const sh = sec.shapes.filter(s => sideOf(s) === side); if (!sh.length) continue;
+    const tops = sec.links.filter(l => l.name === "Top").flatMap(l => l.pts.map(p => p[0])).filter(o => side === "L" ? o <= 0 : o >= 0);
+    const topOut = tops.length ? (side === "L" ? Math.min(...tops) : Math.max(...tops)) : 0;
+    const shOut = side === "L" ? Math.min(...sh.flatMap(s => s.pts.map(p => p[0]))) : Math.max(...sh.flatMap(s => s.pts.map(p => p[0])));
+    if (side === "L" ? shOut < topOut - 0.5 : shOut > topOut + 0.5) res.push(side);
+  }
+  return res;
+}
+async function check(file) {
+  $("result").innerHTML = `<p class="muted">Reading ${file.name} …</p>`;
+  const text = await file.text(), rows = [];
+  const add = (rule, st, item, detail) => rows.push({ rule, st, item, detail });
+  // R7 / R6 file level
+  const nameOk = /^Ver\d+_Bicol_[A-Za-z0-9]+Cluster_\d{2}[A-Za-z]{3}\d{4}_[A-Za-z]+\.xml$/.test(file.name);
+  add("R7", nameOk ? "ok" : "warn", "File name", nameOk ? file.name : `${file.name} — expected Ver<n>_Bicol_<Cluster>Cluster_<ddMonyyyy>_<initials>.xml`);
+  const mb = file.size / 1048576;
+  add("R6", mb <= 50 ? "ok" : "err", "File size", `${mb.toFixed(1)} MB${mb > 50 ? " — over the 50 MB upload limit" : ""}`);
+  const root = (text.match(/<LandXML\b[^>]*>/) || [""])[0], ver = (root.match(/\bversion="([^"]+)"/) || [])[1];
+  add("R6", !root ? "err" : ver === "1.2" ? "ok" : "warn", "LandXML version", !root ? "Not a LandXML file" : `version ${ver || "?"}`);
+  if (!root) return show(file, rows);
+  // R1
+  const cs = (text.match(/<CoordinateSystem\b[^>]*>/) || [""])[0], epsg = (cs.match(/epsgCode="(\d+)"/) || [])[1];
+  add("R1", !epsg ? "err" : epsg === GUIDE.epsg ? "ok" : "warn", "Coordinate system",
+      !epsg ? "No EPSG code in the file — set the drawing zone (R1)" : `EPSG:${epsg}${epsg !== GUIDE.epsg ? ` — InFRA2 expects EPSG:${GUIDE.epsg} (correct for 5B if 3123)` : ""}`);
+  const lin = ((text.match(/<Metric\b[^>]*>/) || [""])[0].match(/linearUnit="([^"]+)"/) || [])[1];
+  add("R1", lin === "meter" ? "ok" : "err", "Units", lin ? `linear unit: ${lin}` : "No metric units found");
+  // surfaces
+  const surfs = [...text.matchAll(/<Surface\b[^>]*name="([^"]*)"/g)].map(m => m[1]);
+  const eg = surfs.filter(n => /eg|exist|lidar|dtm|ground/i.test(n));
+  add("R6", surfs.length ? (eg.length ? "warn" : "ok") : "warn", "Surfaces", `${surfs.length} surface(s)` + (eg.length ? ` — looks like existing ground: ${eg.join(", ")} (leave it out)` : ""));
+  // alignments
+  const aligns = [...text.matchAll(/<Alignment\b[^>]*name="([^"]*)"[\s\S]*?<\/Alignment>/g)];
+  let parsed; try { parsed = CS.parse(text); } catch (e) { add("R5", "err", "Cross sections", "Could not read: " + e.message); return show(file, rows); }
+  for (const m of aligns) {
+    const name = m[1], body = m[0], hasProf = /<ProfAlign\b/.test(body), hasXS = /<CrossSects\b/.test(body);
+    const al = parsed.alignments.find(a => a.name === name);
+    add("R2", hasProf ? "ok" : (hasXS ? "err" : "warn"), `${name} · profile`, hasProf ? (al ? `first profile: ${al.profile}` : "present") : "No design profile" + (hasXS ? " — its sections are skipped" : ""));
+    if (!hasXS) { add("R5", "warn", `${name} · sections`, "No cross sections — station click will not work on this alignment"); continue; }
+    if (!al) continue;
+    const gaps = al.sections.slice(1).map((s, i) => s.sta - al.sections[i].sta).sort((a, b) => a - b);
+    const med = gaps.length ? gaps[gaps.length >> 1] : 0, max = gaps.length ? gaps[gaps.length - 1] : 0;
+    add("R3", med <= GUIDE.sectionSpacing + 0.5 && max <= 10.5 ? "ok" : "warn", `${name} · spacing`,
+        `${al.sections.length} sections, ${CS.fmtSta(al.staStart)} – ${CS.fmtSta(al.staEnd)}, typical ${med.toFixed(1)} m, largest gap ${max.toFixed(1)} m`);
+    const miss = { L: [], R: [] };
+    for (const s of al.sections) for (const side of missingTop(s)) miss[side].push(s.sta);
+    for (const side of ["L", "R"]) if (miss[side].length) {
+      const pct = 100 * miss[side].length / al.sections.length;
+      add("R4", "warn", `${name} · Top link, ${side === "L" ? "left" : "right"}`,
+          `${miss[side].length} of ${al.sections.length} sections (${pct.toFixed(0)} %) have a shape on the ${side === "L" ? "left" : "right"} slope without a Top link, e.g. STA ${miss[side].slice(0, 3).map(CS.fmtSta).join(", ")}`);
+    }
+    if (!miss.L.length && !miss.R.length) add("R4", "ok", `${name} · Top link`, "Top links cover every shape on both sides");
+    const shapeNames = [...new Set(al.sections.flatMap(s => s.shapes.map(x => x.name)))];
+    const bad = shapeNames.filter(n => !/^SP_/.test(n) && !GUIDE.acceptedShapes.includes(n));
+    if (shapeNames.length) add("R4", bad.length ? "warn" : "ok", `${name} · shape codes`, shapeNames.join(", ") + (bad.length ? ` — not in the code list: ${bad.join(", ")}` : ""));
+    const unnamed = al.sections.reduce((a, s) => a + s.links.filter(l => !l.name).length, 0);
+    if (unnamed) add("R4", "info", `${name} · uncoded links`, `${unnamed} link(s) without a code (fine for vertical / hidden links)`);
+  }
+  show(file, rows);
+}
+function show(file, rows) {
+  const n = k => rows.filter(r => r.st === k).length, lab = { ok: "✔ OK", warn: "⚠ Check", err: "✖ Fix", info: "ℹ Info" };
+  window._report = rows;
+  $("result").innerHTML = `<div class="sum"><div><b>${file.name}</b>${new Date().toLocaleString()}</div>
+    <div><b style="color:var(--err)">${n("err")}</b>to fix</div><div><b style="color:var(--warn)">${n("warn")}</b>to check</div><div><b style="color:var(--ok)">${n("ok")}</b>OK</div></div>
+    <p>${n("err") ? "<b style='color:var(--err)'>Fix the ✖ items before uploading.</b>" : n("warn") ? "Upload is possible; please review the ⚠ items." : "<b style='color:var(--ok)'>Ready to upload.</b>"}
+    <button class="act sec noprint" onclick="dlReport()">Download report (CSV)</button></p>
+    <table><tr><th>Rule</th><th>Status</th><th>Item</th><th>Detail</th></tr>
+    ${rows.map(r => `<tr><td><a href="#${r.rule}" onclick="document.querySelector('nav button[data-tab=guide]').click()">${r.rule}</a></td><td class="st ${r.st}">${lab[r.st]}</td><td>${r.item}</td><td>${r.detail}</td></tr>`).join("")}</table>`;
+}
+function csv(rows) { return rows.map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n"); }
+function download(name, text) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + text], { type: "text/csv" })); a.download = name; a.click(); }
+window.dlReport = () => download("xml_check_report.csv", csv([["Rule", "Status", "Item", "Detail"], ...window._report.map(r => [r.rule, r.st, r.item, r.detail])]));
+
+// ---------------- 3. decisions ----------------
+function load(key) { try { return JSON.parse(localStorage.getItem(key) || "{}") || {}; } catch (e) { return {}; } }
+function decisions() {
+  const bands = load("bmrb.v2.bands"), surf = load("bmrb.v2.textures"), seg = [], whole = [];
+  for (const [al, list] of Object.entries(bands)) for (const a of list) seg.push([al, a.side === "L" ? "Left" : "Right", a.side + a.idx, a.from.toFixed(2), a.to.toFixed(2),
+    a.tex ? GUIDE.textureNames[a.tex] || a.tex : "None (remove)", a.tex ? GUIDE.textureCodes[a.tex] || "" : ""]);
+  for (const [k, t] of Object.entries(surf)) { const [cl, s] = k.split("|"); whole.push([cl, s, GUIDE.textureNames[t] || t, GUIDE.textureCodes[t] || ""]); }
+  if (!seg.length && !whole.length) { $("dec").innerHTML = `<p class="muted">No texture choices in this browser yet. Choose textures in the viewer (Dike texture panel, or the Detail window), then come back here.</p>`; return; }
+  const head = ["Alignment", "Side", "Segment", "Sta from (m)", "Sta to (m)", "Texture", "Requested code"];
+  $("dec").innerHTML = (seg.length ? `<h3>Per segment (Detail window)</h3><table><tr>${head.map(h => `<th>${h}</th>`).join("")}</tr>
+      ${seg.map(r => `<tr>${r.map((v, i) => `<td>${i === 3 || i === 4 ? CS.fmtSta(+v) : i === 6 ? `<code>${v}</code>` : v}</td>`).join("")}</tr>`).join("")}</table>
+      <p class="muted">Later rows override earlier rows where station ranges overlap.</p>` : "") +
+    (whole.length ? `<h3>Whole surface (Dike texture panel)</h3><table><tr><th>Cluster</th><th>Surface</th><th>Texture</th><th>Requested code</th></tr>
+      ${whole.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td><code>${r[3]}</code></td></tr>`).join("")}</table>` : "") +
+    `<p class="noprint" style="margin-top:12px"><button class="act" id="dlDec">Download decision sheet (CSV)</button><button class="act sec" onclick="window.print()">Print</button></p>`;
+  $("dlDec").onclick = () => {
+    const meta = [["Bicol decision sheet"], ["Guide", "v" + GUIDE.version], ["Reviewer", $("who").value], ["Note", $("note").value], ["Date", new Date().toISOString().slice(0, 10)], []];
+    const rows = [...meta];
+    if (seg.length) rows.push(["Per segment"], head, ...seg, []);
+    if (whole.length) rows.push(["Whole surface"], ["Cluster", "Surface", "Texture", "Requested code"], ...whole);
+    download(`Bicol_decisions_${new Date().toISOString().slice(0, 10)}.csv`, csv(rows));
+  };
+}
+</script>
+</body>
+</html>
