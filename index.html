@@ -80,6 +80,7 @@
   <label><input type="checkbox" id="chkConc" checked> Concrete (from cross sections)</label>
   <label><input type="checkbox" id="chkAlign" checked> Alignments / Stations</label>
   <label><input type="checkbox" id="chkClip"> Cut terrain under channel surfaces</label>
+  <div class="row" id="terrRow" style="display:none">Terrain <select id="terrSel" style="flex:1"><option value="dtm">DTM – bare ground (with river bed)</option><option value="dsm">DSM – surface (trees, buildings, water)</option></select></div>
   <div class="row">Opacity <input type="range" id="alpha" min="0.2" max="1" step="0.05" value="1" style="flex:1"></div>
   <div class="row" style="margin-top:4px"><button id="btnZoom">Zoom to project</button></div>
   <h4>Dike texture <span class="muted">(prototype)</span></h4>
@@ -152,11 +153,21 @@ try {
   if (C.ION_TOKEN && C.ORTHO_ASSET_ID) viewer.imageryLayers.addImageryProvider(await Cesium.IonImageryProvider.fromAssetId(C.ORTHO_ASSET_ID));
   log("ok", C.ION_TOKEN && C.ORTHO_ASSET_ID ? "✔ Orthophoto" : "✔ Satellite imagery (Esri)");
 } catch (e) { log("err", `✖ Imagery: ${e.message || e}`); try { viewer.imageryLayers.addImageryProvider(ESRI()); } catch (e2) {} }
+let dtmProvider = null, dsmProvider = null;          // sections always sample the DTM (bare ground)
 if (C.ION_TOKEN) {
   try {
-    scene.terrainProvider = C.TERRAIN_ASSET_ID ? await Cesium.CesiumTerrainProvider.fromIonAssetId(C.TERRAIN_ASSET_ID) : await Cesium.createWorldTerrainAsync();
+    scene.terrainProvider = dtmProvider = C.TERRAIN_ASSET_ID ? await Cesium.CesiumTerrainProvider.fromIonAssetId(C.TERRAIN_ASSET_ID) : await Cesium.createWorldTerrainAsync();
     log("ok", C.TERRAIN_ASSET_ID ? "✔ Terrain (DTM)" : "✔ Terrain (Cesium World Terrain)");
   } catch (e) { log("err", `✖ Terrain: ${e.message || e}`); }
+  if (C.DSM_ASSET_ID && dtmProvider) {
+    document.getElementById("terrRow").style.display = "";
+    document.getElementById("terrSel").onchange = async e => {
+      try {
+        if (e.target.value === "dsm") { dsmProvider = dsmProvider || await Cesium.CesiumTerrainProvider.fromIonAssetId(C.DSM_ASSET_ID); scene.terrainProvider = dsmProvider; log("ok", "✔ Terrain: DSM shown (sections still use DTM)"); }
+        else { scene.terrainProvider = dtmProvider; log("ok", "✔ Terrain: DTM shown"); }
+      } catch (err) { log("err", `✖ DSM: ${err.message || err}`); }
+    };
+  }
 } else log("warn", "No Cesium ion token in config.js: flat globe, no terrain. Existing ground in sections needs a token.");
 
 // ---------- Supabase (read only) ----------
@@ -529,9 +540,10 @@ async function sampleGround(xs, al, sec) {
   const step = Math.max(0.5, (o1 - o0) / 160), offs = [];
   for (let o = o0; o <= o1 + 1e-6; o += step) offs.push(o);
   const ll = offs.map(o => { const [E, N] = CS.gridPoint(al, sec.sta, o); return xs.toLL(E, N); });
-  if (scene.terrainProvider instanceof Cesium.EllipsoidTerrainProvider) throw new Error("terrain (DTM) is not loaded");
+  const tp = dtmProvider || scene.terrainProvider;
+  if (tp instanceof Cesium.EllipsoidTerrainProvider) throw new Error("terrain (DTM) is not loaded");
   const sampler = window.BMRB_SAMPLE_TERRAIN || Cesium.sampleTerrainMostDetailed;      // hook for offline tests
-  const res = await sampler(scene.terrainProvider, ll.map(([lon, lat]) => Cesium.Cartographic.fromDegrees(lon, lat)));
+  const res = await sampler(tp, ll.map(([lon, lat]) => Cesium.Cartographic.fromDegrees(lon, lat)));
   const out = res.map((c, i) => [offs[i], c.height - BMRB.geoid(ll[i][1], ll[i][0])]).filter(p => isFinite(p[1]));
   groundCache.set(k, out); return out;
 }

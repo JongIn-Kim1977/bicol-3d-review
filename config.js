@@ -8,8 +8,9 @@ window.APP_CONFIG = {
   // Empty token  -> Esri satellite imagery on a flat globe, no terrain.
   // With a token -> Cesium World Terrain (or your own DTM asset) + your orthophoto asset.
   ION_TOKEN:        "",
-  TERRAIN_ASSET_ID: null,      // your merged DTM asset id (height reference = MSL); null = Cesium World Terrain
-  ORTHO_ASSET_ID:   null,      // your orthophoto asset id; null = none
+  TERRAIN_ASSET_ID: 6204501,   // "Bicol CP3 DTM 1m (MSL)" – bare ground with river bed, merged with Cesium World Terrain
+  ORTHO_ASSET_ID:   null,      // your orthophoto asset id; null = Bing aerial (with token) or Esri
+  DSM_ASSET_ID:     6204507,   // "Bicol CP3 DSM 1m (MSL)" – surface model, switchable in Layers
 
   // Supabase design store – optional. Leave empty to open LandXML / GeoJSON files from your PC.
   // Needs a public bucket and a "design_uploads" table (see README.md).
@@ -19,5 +20,5 @@ window.APP_CONFIG = {
 
   CLUSTERS:         [],        // e.g. ["Naga", "Pili", "Libmanan"] – shown in the list even before a design exists
   CLIP_MATCH:       "channel", // design surfaces whose name contains this text can cut the terrain
-  HOME:             { lon: 123.25, lat: 13.55, height: 90000 }   // Bicol River Basin (Camarines Sur)
+  HOME:             { lon: 123.112, lat: 13.648, height: 12000 }  // Bicol River CP3 (west of Naga City)
 };
